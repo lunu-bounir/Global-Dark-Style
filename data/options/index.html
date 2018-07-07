@@ -1,0 +1,97 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>Global Dark Style :: Options page</title>
+  </head>
+
+  <body>
+    <style type="text/css">
+      body {
+        min-width: 500px;
+      }
+      textarea {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      table {
+        width: 100%;
+        box-sizing: border-box;
+        table-layout: fixed;
+        border-collapse: collapse;
+      }
+      tbody:empty::before {
+        content: 'Empty';
+        font-style: italic;
+        color: #ccc;
+      }
+      th {
+        text-align: left;
+      }
+      tbody tr:nth-child(even) {
+        background-color: rgba(0, 0, 0, 0.1);
+      }
+
+      td {
+        overflow: hidden;
+        cursor: pointer;
+        white-space: pre;
+      }
+      td:last-child {
+        text-align: center;
+      }
+      td:last-child:hover {
+        background-color: red;
+        color: white;
+        cursor: pointer;
+      }
+      span {
+        margin-bottom: 5px;
+        display: inline-block;
+      }
+    </style>
+    <h2>Blacklist</h2>
+    <span>Comma-separated list of hostnames that the dark theme is not being applied to</span>
+    <textarea rows=2 id="blacklist"></textarea>
+
+    <h2>Global Custom CSS</h2>
+    <span>Append the following CSS rules to the dark theme's default rules</span>
+    <textarea rows="4" id="styles"></textarea>
+
+    <h2>Custom CSS per hostname</h2>
+    <span>Define additional CSS rules per hostname. If a hostname is already in the list, the CSS rules will be overwritten. You can click on an item in the list to append some rules.</span>
+    <form id="custom">
+      <div style="display: flex">
+        <input type="text" name="hostname" placeholder="hostname (e.g.: www.google.com)" required style="flex: 1;">
+        <input type="submit" value="Add">
+      </div>
+      <textarea rows="4" name="style" required></textarea>
+    </form>
+    <div>
+      <table>
+        <colgroup>
+          <col width="100px">
+          <col>
+          <col width="20px">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Hostname</th>
+            <th>CSS Rules</th>
+            <th>-</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <p>
+      <input type="button" id="support" value="Support Development">
+      <input type="button" id="reset" value="Reset">
+      <input type="button" id="save" value="Save" style="float: right;">
+      <span id="info"></span>
+    </p>
+    <script src="index.js"></script>
+  </body>
+</html>
