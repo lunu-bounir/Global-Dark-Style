@@ -2,7 +2,6 @@
 'use strict';
 
 var engine = {};
-var startUps = [];
 
 var notify = message => chrome.notifications.create({
   title: chrome.runtime.getManifest().name,
@@ -33,7 +32,6 @@ engine.execute = (d, obj) => {
     const theme = localStorage.getItem('theme');
     const sg = localStorage.getItem('styles') || '';
     const sc = localStorage.getItem('style.' + b) || '';
-    console.log(atob(sc));
     code = `
       var style = document.createElement('style');
       style.id = 'global-dark-style';
@@ -97,24 +95,33 @@ engine.remove = () => {
 };
 
 // browser action
-chrome.browserAction.onClicked.addListener(() => chrome.storage.local.get({
-  enabled: true
-}, prefs => chrome.storage.local.set({
-  enabled: prefs.enabled === false
-})));
+chrome.browserAction.onClicked.addListener(() => {
+  const enabled = localStorage.getItem('enabled') !== 'true';
+  localStorage.setItem('enabled', enabled);
+
+  engine[enabled ? 'install' : 'remove']();
+});
 
 // context-menu
-startUps.push(() => chrome.contextMenus.create({
-  title: 'Add/remove this domain to/from the blacklist',
-  contexts: ['browser_action'],
-  id: 'blacklist',
-  documentUrlPatterns: ['*://*/*']
-}), () => chrome.contextMenus.create({
-  title: 'Report an issue',
-  contexts: ['browser_action'],
-  id: 'report',
-  documentUrlPatterns: ['*://*/*']
-}));
+{
+  const callback = () => {
+    chrome.contextMenus.create({
+      title: 'Add/remove this domain to/from the blacklist',
+      contexts: ['browser_action'],
+      id: 'blacklist',
+      documentUrlPatterns: ['*://*/*']
+    });
+    chrome.contextMenus.create({
+      title: 'Report an issue',
+      contexts: ['browser_action'],
+      id: 'report',
+      documentUrlPatterns: ['*://*/*']
+    });
+  };
+
+  chrome.runtime.onStartup.addListener(callback);
+  chrome.runtime.onInstalled.addListener(callback);
+}
 chrome.contextMenus.onClicked.addListener((d, tab) => {
   if (d.menuItemId === 'blacklist') {
     if (tab.url.startsWith('http')) {
@@ -126,13 +133,9 @@ chrome.contextMenus.onClicked.addListener((d, tab) => {
         if (localStorage.getItem(name)) {
           localStorage.removeItem(name);
           notify(`"${hostname}" is removed from the blacklist.`);
-          chrome.storage.local.get({
-            enabled: true
-          }, prefs => {
-            if (prefs.enabled) {
-              tabs.forEach(tab => engine.style.add(tab));
-            }
-          });
+          if (localStorage.getItem('enabled') === 'true') {
+            tabs.forEach(tab => engine.style.add(tab));
+          }
         }
         else {
           localStorage.setItem(name, 1);
@@ -152,38 +155,56 @@ chrome.contextMenus.onClicked.addListener((d, tab) => {
   }
 });
 
-// start-up
-{
-  const callback = () => startUps.forEach(c => c());
-  chrome.runtime.onStartup.addListener(callback);
-  chrome.runtime.onInstalled.addListener(callback);
-}
-
-// load theme
-var onInstalled = () => chrome.storage.local.get({
-  theme: 'global-dark-style.css',
-  enabled: true
-}, ({theme, enabled}) => {
+// onInstalled: load the theme
+chrome.runtime.onInstalled.addListener(() => chrome.storage.local.get({
+  theme: 'global-dark-style.css'
+}, ({theme}) => {
   fetch('data/themes/' + theme).then(r => r.text()).then(content => {
     localStorage.setItem('theme', btoa(content));
-    if (enabled) {
-      engine.install();
-    }
+    localStorage.setItem('enabled', true);
+    engine.install();
   });
-});
+}));
 
 // init
-startUps.push(() => chrome.storage.local.get({
-  enabled: true
-}, prefs => engine[prefs.enabled ? 'install' : 'remove']()));
+engine[localStorage.getItem('enabled') === 'true' ? 'install' : 'remove']();
 
-
-chrome.runtime.onInstalled.addListener(onInstalled);
 chrome.storage.onChanged.addListener(prefs => {
-  if (prefs.enabled) {
-    engine[prefs.enabled.newValue ? 'install' : 'remove']();
-  }
   if (prefs.styles) {
     localStorage.setItem('styles', btoa(prefs.styles.newValue));
   }
 });
+// FAQs & Feedback
+chrome.storage.local.get({
+  'version': null,
+  'faqs': true,
+  'last-update': 0
+}, prefs => {
+  const version = chrome.runtime.getManifest().version;
+
+  if (prefs.version ? (prefs.faqs && prefs.version !== version) : true) {
+    const now = Date.now();
+    const doUpdate = (now - prefs['last-update']) / 1000 / 60 / 60 / 24 > 30;
+    chrome.storage.local.set({
+      version,
+      'last-update': doUpdate ? Date.now() : prefs['last-update']
+    }, () => {
+      // do not display the FAQs page if last-update occurred less than 30 days ago.
+      if (doUpdate) {
+        const p = Boolean(prefs.version);
+        window.setTimeout(() => chrome.tabs.create({
+          url: chrome.runtime.getManifest().homepage_url + '?version=' + version +
+            '&type=' + (p ? ('upgrade&p=' + prefs.version) : 'install'),
+          active: p === false
+        }), 3000);
+      }
+    });
+  }
+});
+
+{
+  const {name, version} = chrome.runtime.getManifest();
+  chrome.runtime.setUninstallURL(
+    chrome.runtime.getManifest().homepage_url + '?rd=feedback&name=' + name + '&version=' + version
+  );
+}
